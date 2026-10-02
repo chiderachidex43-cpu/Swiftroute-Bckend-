@@ -48,3 +48,9 @@ jobs:
 
       - name: Build and test
         run: bash mvnw clean test
+
+      - name: Validate Kubernetes manifest
+        uses: azure/setup-kubectl@v4
+
+      - name: Check Kubernetes manifest
+        run: kubectl apply --dry-run=client -f k8s/deployment.yaml
