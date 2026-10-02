@@ -50,7 +50,8 @@ jobs:
         run: bash mvnw clean test
 
       - name: Validate Kubernetes manifest
-        uses: azure/setup-kubectl@v4
-
-      - name: Check Kubernetes manifest
-        run: kubectl apply --dry-run=client --validate=false -f k8s/deployment.yaml
+        uses: azure/k8s-lint@v4
+        with:
+          manifests: |
+            k8s/deployment.yaml
+          kubeconformOpts: -summary
