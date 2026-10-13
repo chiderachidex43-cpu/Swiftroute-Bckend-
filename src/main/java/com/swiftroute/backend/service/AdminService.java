@@ -1,7 +1,11 @@
+
 package com.swiftroute.backend.service;
+
+import java.util.List;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.swiftroute.backend.model.Role;
 import com.swiftroute.backend.model.User;
@@ -27,8 +31,12 @@ public class AdminService {
             String phone,
             String password) {
 
-        if (userRepository.findByEmail(email).isPresent()) {
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new RuntimeException("Email already exists");
+        }
+
+        if (userRepository.existsByPhone(phone)) {
+            throw new RuntimeException("Phone number already exists");
         }
 
         User admin = new User();
@@ -36,14 +44,40 @@ public class AdminService {
         admin.setName(name);
         admin.setEmail(email);
         admin.setPhone(phone);
-
-        String hashedPassword =
-                passwordEncoder.encode(password);
-
-        admin.setPasswordHash(hashedPassword);
-
+        admin.setPasswordHash(passwordEncoder.encode(password));
         admin.setRole(Role.ADMIN);
+        admin.setRiderApproved(true);
 
         return userRepository.save(admin);
+    }
+
+    public List<User> getPendingRiders() {
+        return userRepository.findAllByRoleAndRiderApprovedFalse(
+                Role.RIDER
+        );
+    }
+
+    @Transactional
+    public User approveRider(Long id) {
+
+        User rider = userRepository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Rider not found"));
+
+        if (rider.getRole() != Role.RIDER) {
+            throw new RuntimeException(
+                    "This user is not a rider"
+            );
+        }
+
+        if (rider.isRiderApproved()) {
+            throw new RuntimeException(
+                    "Rider is already approved"
+            );
+        }
+
+        rider.setRiderApproved(true);
+
+        return userRepository.save(rider);
     }
 }

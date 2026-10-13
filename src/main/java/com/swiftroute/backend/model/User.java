@@ -1,3 +1,4 @@
+
 package com.swiftroute.backend.model;
 
 import jakarta.persistence.Entity;
@@ -7,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Column;
 
 @Entity
 @Table(name = "users")
@@ -18,14 +20,23 @@ public class User {
 
     private String name;
 
+    @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(nullable = false, unique = true)
     private String phone;
 
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     private Role role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
+
+    @Column(nullable = false)
+    private boolean riderApproved = false;
 
     public Long getId() {
         return id;
@@ -69,5 +80,21 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public AccountStatus getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
+    }
+
+    public boolean isRiderApproved() {
+        return riderApproved;
+    }
+
+    public void setRiderApproved(boolean riderApproved) {
+        this.riderApproved = riderApproved;
     }
 }

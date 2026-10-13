@@ -13,10 +13,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -48,13 +50,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
 
                 // Public authentication endpoints
-                .requestMatchers(
+              .requestMatchers(
                     "/api/auth/register",
                     "/api/auth/login",
+                    "/api/auth/refresh",
                     "/api/hello",
                     "/error"
                 ).permitAll()
-
                 // Admin-only endpoints
                 .requestMatchers(
                     "/api/admin/**"
