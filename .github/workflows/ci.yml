@@ -33,6 +33,7 @@ jobs:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: ci-only-test-secret-key-123456789012345678901234567890
+      OTP_HASH_SECRET: ci-only-test-otp-hash-secret-key-12345678901234567890123456789012
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
