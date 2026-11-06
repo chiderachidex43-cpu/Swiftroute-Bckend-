@@ -30,8 +30,9 @@ jobs:
 
     env:
       DB_URL: jdbc:postgresql://localhost:5432/swiftroute
+      DB_USER: postgres
       DB_PASSWORD: postgres
-
+      JWT_SECRET: ci-only-test-secret-key-123456789012345678901234567890
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
