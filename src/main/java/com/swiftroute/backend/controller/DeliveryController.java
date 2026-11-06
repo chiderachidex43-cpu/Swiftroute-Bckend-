@@ -6,6 +6,8 @@ import com.swiftroute.backend.model.Delivery;
 import com.swiftroute.backend.service.DeliveryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+import java.util.Map;
 
 import java.security.Principal;
 import java.util.List;
@@ -22,16 +24,28 @@ public class DeliveryController {
 
     @PostMapping
     public ResponseEntity<DeliveryResponse> createDelivery(
-            @RequestBody DeliveryRequest request,
+     @Valid @RequestBody DeliveryRequest request,
             Principal principal) {
 
         Delivery delivery = deliveryService.createDelivery(
                 principal.getName(),
                 request.getPickupLocation(),
+                request.getPickupCountryCode(),
                 request.getDestination(),
                 request.getPackageDetails(),
                 request.getVehicleType(),
-                request.getAmount()
+                request.getAmount(),
+                 request.getReceiver(),
+                request.getReceiverPhone(),
+                request.getReceiverEmail(),
+                request.getGoodsName(),
+                request.getQuantity(),
+                request.getNote(),
+                request.getSpeed(),
+                request.getPickupLatitude(),
+                request.getPickupLongitude(),
+                request.getDestinationLatitude(),
+                request.getDestinationLongitude()
         );
 
         return ResponseEntity.ok(DeliveryResponse.from(delivery));
@@ -79,5 +93,27 @@ public ResponseEntity<?> cancelDelivery(
                 ));
     }
 }
+
+@GetMapping("/{id}/tracking")
+public ResponseEntity<?> getDeliveryTracking(
+        @PathVariable Long id,
+        Principal principal) {
+
+    try {
+        Delivery delivery = deliveryService.getDeliveryTracking(
+                id,
+                principal.getName()
+        );
+
+        return ResponseEntity.ok(DeliveryResponse.from(delivery));
+
+    } catch (RuntimeException e) {
+        return ResponseEntity.badRequest()
+                .body(java.util.Map.of(
+                        "message", e.getMessage()
+                ));
+    }
+}
+
 
 }

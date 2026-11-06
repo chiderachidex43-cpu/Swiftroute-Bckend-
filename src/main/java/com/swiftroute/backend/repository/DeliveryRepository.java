@@ -6,12 +6,16 @@ import com.swiftroute.backend.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
 
     List<Delivery> findByCustomer(User customer);
 
     List<Delivery> findByRider(User rider);
+
+    Optional<Delivery> findByTrackingNumber(String trackingNumber);
+    long countByTrackingNumberStartingWith(String prefix);
 
     List<Delivery> findByStatus(DeliveryStatus status);
 }

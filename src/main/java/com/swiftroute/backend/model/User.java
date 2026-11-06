@@ -27,7 +27,13 @@ public class User {
     private String phone;
 
     private String passwordHash;
+    
+    @Column(nullable = false)
+    private int paymentFailedAttempts = 0;
 
+    @Column
+    private Long paymentLockedUntil;
+        
     @Enumerated(EnumType.STRING)
     private Role role;
 
@@ -97,4 +103,20 @@ public class User {
     public void setRiderApproved(boolean riderApproved) {
         this.riderApproved = riderApproved;
     }
+
+    public int getPaymentFailedAttempts() {
+    return paymentFailedAttempts;
+}
+
+public void setPaymentFailedAttempts(int paymentFailedAttempts) {
+    this.paymentFailedAttempts = paymentFailedAttempts;
+}
+
+public Long getPaymentLockedUntil() {
+    return paymentLockedUntil;
+}
+
+public void setPaymentLockedUntil(Long paymentLockedUntil) {
+    this.paymentLockedUntil = paymentLockedUntil;
+}
 }

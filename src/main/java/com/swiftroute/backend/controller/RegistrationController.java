@@ -2,7 +2,8 @@
 package com.swiftroute.backend.controller;
 
 import java.util.Map;
-
+import java.security.Principal;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.swiftroute.backend.dto.LoginRequest;
@@ -65,6 +66,7 @@ public class RegistrationController {
             return ResponseEntity.badRequest()
                     .body(e.getMessage());
         }
+
     }
 
     @PostMapping("/login")
@@ -99,6 +101,16 @@ public class RegistrationController {
             String refreshToken =
                     jwtService.generateRefreshToken(user.getEmail());
 
+                    System.err.println(
+        "Access token generated: "
+        + (accessToken != null && !accessToken.isBlank())
+);
+
+System.err.println(
+        "Refresh token generated: "
+        + (refreshToken != null && !refreshToken.isBlank())
+);
+
             return ResponseEntity.ok(
                     new LoginResponse(
                             user.getId(),
@@ -113,6 +125,8 @@ public class RegistrationController {
 
         } catch (RuntimeException e) {
             String message = e.getMessage();
+
+            System.err.println("LOGIN FAILURE: " + e.getMessage());
 
             if ("Account is suspended".equals(message)) {
                 return ResponseEntity.status(403)
@@ -169,4 +183,35 @@ public class RegistrationController {
                 Map.of("accessToken", newAccessToken)
         );
     }
+    @PostMapping("/verify-payment-password")
+public ResponseEntity<Map<String, Object>> verifyPaymentPassword(
+        @RequestBody Map<String, String> request,
+        Principal principal) {
+
+    if (principal == null) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of(
+                        "success", false,
+                        "message", "Please sign in again"
+                ));
+    }
+
+    String password = request.get("password");
+
+    if (password == null || password.isBlank()) {
+        return ResponseEntity.badRequest()
+                .body(Map.of(
+                        "success", false,
+                        "message", "Password is required"
+                ));
+    }
+
+    Map<String, Object> result =
+            registrationService.verifyPaymentPassword(
+                    principal.getName(),
+                    password
+            );
+
+    return ResponseEntity.ok(result);
+}
 }
