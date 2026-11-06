@@ -39,7 +39,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '26'
+          java-version: '17'
           distribution: 'temurin'
           cache: maven
 
