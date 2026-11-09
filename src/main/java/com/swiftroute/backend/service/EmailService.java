@@ -9,13 +9,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Base64;
+import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import jakarta.mail.Message;
 import jakarta.mail.Session;
@@ -37,7 +40,16 @@ public class EmailService {
     @Value("${GMAIL_SENDER_EMAIL}")
     private String senderEmail;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
+
+    public EmailService(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .build();
+    }
 
     public void sendOtpEmail(
             String receiverEmail,
@@ -48,6 +60,10 @@ public class EmailService {
             // 1. Obtain a fresh Gmail access token
             String accessToken = getAccessToken();
 
+            System.out.println(
+                    "SwiftRoute: Gmail access token obtained successfully."
+            );
+
             // 2. Build the OTP email
             Properties properties = new Properties();
             Session session = Session.getInstance(properties);
@@ -55,6 +71,7 @@ public class EmailService {
             MimeMessage message = new MimeMessage(session);
 
             message.setFrom(new InternetAddress(senderEmail));
+
             message.setRecipients(
                     Message.RecipientType.TO,
                     InternetAddress.parse(receiverEmail, true)
@@ -76,6 +93,8 @@ public class EmailService {
                     StandardCharsets.UTF_8.name()
             );
 
+            message.saveChanges();
+
             // 3. Encode the email for the Gmail API
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             message.writeTo(output);
@@ -84,40 +103,72 @@ public class EmailService {
                     .withoutPadding()
                     .encodeToString(output.toByteArray());
 
-            // 4. Send through Gmail API
-            String jsonBody = "{\"raw\":\"" + rawEmail + "\"}";
+            // 4. Build the Gmail API JSON request
+            String jsonBody = objectMapper.writeValueAsString(
+                    Map.of("raw", rawEmail)
+            );
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(
                             "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
                     ))
+                    .timeout(Duration.ofSeconds(30))
                     .header("Authorization", "Bearer " + accessToken)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();
 
+            // 5. Send the email
             HttpResponse<String> response = httpClient.send(
                     request,
                     HttpResponse.BodyHandlers.ofString()
             );
 
+            System.out.println(
+                    "SwiftRoute Gmail API HTTP status: " +
+                    response.statusCode()
+            );
+
             if (response.statusCode() < 200 ||
                     response.statusCode() >= 300) {
+
                 throw new IllegalStateException(
                         "Gmail API failed. HTTP " +
-                        response.statusCode() + ": " + response.body()
+                        response.statusCode() + ": " +
+                        response.body()
                 );
             }
 
-            System.out.println("SwiftRoute OTP email sent successfully.");
+            System.out.println(
+                    "SwiftRoute OTP email sent successfully."
+            );
 
         } catch (InterruptedException e) {
+
             Thread.currentThread().interrupt();
+
+            System.err.println(
+                    "SwiftRoute email operation was interrupted."
+            );
+
+            e.printStackTrace();
+
             throw new IllegalStateException(
                     "Email sending was interrupted.", e
             );
 
         } catch (Exception e) {
+
+            System.err.println(
+                    "========== SWIFTROUTE EMAIL ERROR =========="
+            );
+
+            e.printStackTrace();
+
+            System.err.println(
+                    "============================================"
+            );
+
             throw new IllegalStateException(
                     "Failed to send SwiftRoute OTP email.", e
             );
@@ -127,6 +178,7 @@ public class EmailService {
     private String getAccessToken()
             throws IOException, InterruptedException {
 
+        // 1. Prepare Google's OAuth refresh-token request
         String form = "client_id=" + encode(clientId)
                 + "&client_secret=" + encode(clientSecret)
                 + "&refresh_token=" + encode(refreshToken)
@@ -136,6 +188,7 @@ public class EmailService {
                 .uri(URI.create(
                         "https://oauth2.googleapis.com/token"
                 ))
+                .timeout(Duration.ofSeconds(30))
                 .header(
                         "Content-Type",
                         "application/x-www-form-urlencoded"
@@ -143,6 +196,7 @@ public class EmailService {
                 .POST(HttpRequest.BodyPublishers.ofString(form))
                 .build();
 
+        // 2. Ask Google for an access token
         HttpResponse<String> response = httpClient.send(
                 request,
                 HttpResponse.BodyHandlers.ofString()
@@ -150,26 +204,32 @@ public class EmailService {
 
         if (response.statusCode() < 200 ||
                 response.statusCode() >= 300) {
+
             throw new IllegalStateException(
                     "Google token request failed. HTTP " +
-                    response.statusCode() + ": " + response.body()
+                    response.statusCode() + ": " +
+                    response.body()
             );
         }
 
-        Matcher matcher = Pattern.compile(
-                "\"access_token\"\\s*:\\s*\"([^\"]+)\""
-        ).matcher(response.body());
+        // 3. Read Google's JSON response using Jackson
+        JsonNode json = objectMapper.readTree(response.body());
 
-        if (!matcher.find()) {
+        String accessToken = json.path("access_token").asText("");
+
+        if (accessToken.isBlank()) {
             throw new IllegalStateException(
                     "Google did not return an access token."
             );
         }
 
-        return matcher.group(1);
+        return accessToken;
     }
 
     private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return URLEncoder.encode(
+                value,
+                StandardCharsets.UTF_8
+        );
     }
 }
