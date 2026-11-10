@@ -1,43 +1,26 @@
 
 package com.swiftroute.backend.service;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
+import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-
-import jakarta.mail.Message;
-import jakarta.mail.Session;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
 
-    @Value("${GMAIL_CLIENT_ID}")
-    private String clientId;
+    @Value("${BREVO_API_KEY}")
+    private String brevoApiKey;
 
-    @Value("${GMAIL_CLIENT_SECRET}")
-    private String clientSecret;
-
-    @Value("${GMAIL_REFRESH_TOKEN}")
-    private String refreshToken;
-
-    @Value("${GMAIL_SENDER_EMAIL}")
+    @Value("${BREVO_SENDER_EMAIL}")
     private String senderEmail;
 
     private final HttpClient httpClient;
@@ -57,90 +40,75 @@ public class EmailService {
             String otp) {
 
         try {
-            // 1. Obtain a fresh Gmail access token
-            String accessToken = getAccessToken();
 
-            System.out.println(
-                    "SwiftRoute: Gmail access token obtained successfully."
-            );
-
-            // 2. Build the OTP email
-            Properties properties = new Properties();
-            Session session = Session.getInstance(properties);
-
-            MimeMessage message = new MimeMessage(session);
-
-            message.setFrom(new InternetAddress(senderEmail));
-
-            message.setRecipients(
-                    Message.RecipientType.TO,
-                    InternetAddress.parse(receiverEmail, true)
-            );
-
-            message.setSubject(
-                    "Your SwiftRoute Delivery Verification Code",
-                    StandardCharsets.UTF_8.name()
-            );
-
-            message.setText(
+            // 1. Build the email content
+            String emailContent =
                     "Hello " + receiverName + ",\n\n" +
                     "Your SwiftRoute delivery is ready for confirmation.\n\n" +
                     "Your delivery verification code is: " + otp + "\n\n" +
                     "This code expires in 5 minutes.\n\n" +
                     "Please share this code with your delivery rider " +
                     "to confirm receipt.\n\n" +
-                    "Thank you for choosing SwiftRoute!",
-                    StandardCharsets.UTF_8.name()
+                    "Thank you for choosing SwiftRoute!";
+
+            // 2. Build the Brevo API JSON request body
+            Map<String, Object> emailBody = Map.of(
+                    "sender", Map.of(
+                            "name", "SwiftRoute Logistics",
+                            "email", senderEmail
+                    ),
+                    "to", List.of(
+                            Map.of(
+                                    "email", receiverEmail,
+                                    "name", receiverName
+                            )
+                    ),
+                    "subject",
+                    "Your SwiftRoute Delivery Verification Code",
+                    "textContent",
+                    emailContent
             );
 
-            message.saveChanges();
+            String jsonBody = objectMapper.writeValueAsString(emailBody);
 
-            // 3. Encode the email for the Gmail API
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            message.writeTo(output);
-
-            String rawEmail = Base64.getUrlEncoder()
-                    .withoutPadding()
-                    .encodeToString(output.toByteArray());
-
-            // 4. Build the Gmail API JSON request
-            String jsonBody = objectMapper.writeValueAsString(
-                    Map.of("raw", rawEmail)
-            );
-
+            // 3. Build the HTTPS request to Brevo
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(
-                            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+                            "https://api.brevo.com/v3/smtp/email"
                     ))
                     .timeout(Duration.ofSeconds(30))
-                    .header("Authorization", "Bearer " + accessToken)
+                    .header("api-key", brevoApiKey)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .header("Accept", "application/json")
+                    .POST(
+                            HttpRequest.BodyPublishers.ofString(jsonBody)
+                    )
                     .build();
 
-            // 5. Send the email
+            // 4. Send the email
             HttpResponse<String> response = httpClient.send(
                     request,
                     HttpResponse.BodyHandlers.ofString()
             );
 
             System.out.println(
-                    "SwiftRoute Gmail API HTTP status: " +
+                    "SwiftRoute Brevo API HTTP status: " +
                     response.statusCode()
             );
 
+            // 5. Check whether Brevo accepted the request
             if (response.statusCode() < 200 ||
                     response.statusCode() >= 300) {
 
                 throw new IllegalStateException(
-                        "Gmail API failed. HTTP " +
+                        "Brevo API failed. HTTP " +
                         response.statusCode() + ": " +
                         response.body()
                 );
             }
 
             System.out.println(
-                    "SwiftRoute OTP email sent successfully."
+                    "SwiftRoute OTP email accepted by Brevo."
             );
 
         } catch (InterruptedException e) {
@@ -150,8 +118,6 @@ public class EmailService {
             System.err.println(
                     "SwiftRoute email operation was interrupted."
             );
-
-            e.printStackTrace();
 
             throw new IllegalStateException(
                     "Email sending was interrupted.", e
@@ -173,63 +139,5 @@ public class EmailService {
                     "Failed to send SwiftRoute OTP email.", e
             );
         }
-    }
-
-    private String getAccessToken()
-            throws IOException, InterruptedException {
-
-        // 1. Prepare Google's OAuth refresh-token request
-        String form = "client_id=" + encode(clientId)
-                + "&client_secret=" + encode(clientSecret)
-                + "&refresh_token=" + encode(refreshToken)
-                + "&grant_type=refresh_token";
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(
-                        "https://oauth2.googleapis.com/token"
-                ))
-                .timeout(Duration.ofSeconds(30))
-                .header(
-                        "Content-Type",
-                        "application/x-www-form-urlencoded"
-                )
-                .POST(HttpRequest.BodyPublishers.ofString(form))
-                .build();
-
-        // 2. Ask Google for an access token
-        HttpResponse<String> response = httpClient.send(
-                request,
-                HttpResponse.BodyHandlers.ofString()
-        );
-
-        if (response.statusCode() < 200 ||
-                response.statusCode() >= 300) {
-
-            throw new IllegalStateException(
-                    "Google token request failed. HTTP " +
-                    response.statusCode() + ": " +
-                    response.body()
-            );
-        }
-
-        // 3. Read Google's JSON response using Jackson
-        JsonNode json = objectMapper.readTree(response.body());
-
-        String accessToken = json.path("access_token").asText("");
-
-        if (accessToken.isBlank()) {
-            throw new IllegalStateException(
-                    "Google did not return an access token."
-            );
-        }
-
-        return accessToken;
-    }
-
-    private String encode(String value) {
-        return URLEncoder.encode(
-                value,
-                StandardCharsets.UTF_8
-        );
     }
 }
