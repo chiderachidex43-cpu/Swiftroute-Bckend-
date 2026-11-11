@@ -18,4 +18,14 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
     long countByTrackingNumberStartingWith(String prefix);
 
     List<Delivery> findByStatus(DeliveryStatus status);
+
+    long countByStatus(DeliveryStatus status);
+
+long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+        java.time.LocalDateTime start,
+        java.time.LocalDateTime end
+);
+
+List<Delivery> findTop6ByOrderByCreatedAtDesc();
+
 }

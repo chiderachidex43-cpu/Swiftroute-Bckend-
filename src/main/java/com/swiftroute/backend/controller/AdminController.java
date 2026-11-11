@@ -6,8 +6,11 @@ import java.util.List;
 import java.util.Map;
 
 import com.swiftroute.backend.dto.AdminCreationRequest;
+import com.swiftroute.backend.dto.AdminDashboardResponse;
+import com.swiftroute.backend.dto.DeliveryResponse;
 import com.swiftroute.backend.model.Delivery;
 import com.swiftroute.backend.model.User;
+import com.swiftroute.backend.service.AdminDashboardService;
 import com.swiftroute.backend.service.AdminService;
 import com.swiftroute.backend.service.DeliveryService;
 
@@ -21,12 +24,16 @@ public class AdminController {
 
     private final AdminService adminService;
     private final DeliveryService deliveryService;
+    private final AdminDashboardService adminDashboardService;
 
     public AdminController(
             AdminService adminService,
-            DeliveryService deliveryService) {
+            DeliveryService deliveryService,
+            AdminDashboardService adminDashboardService) {
+
         this.adminService = adminService;
         this.deliveryService = deliveryService;
+        this.adminDashboardService = adminDashboardService;
     }
 
     // Create an admin account
@@ -131,16 +138,29 @@ public class AdminController {
                     .body(Map.of("message", e.getMessage()));
         }
     }
+
+    // Retrieve all deliveries
     @GetMapping("/deliveries")
-@PreAuthorize("hasRole('ADMIN')")
-public ResponseEntity<List<com.swiftroute.backend.dto.DeliveryResponse>> getAllDeliveries() {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<DeliveryResponse>> getAllDeliveries() {
 
-    List<com.swiftroute.backend.dto.DeliveryResponse> deliveries =
-            deliveryService.getAllDeliveries()
-                    .stream()
-                    .map(com.swiftroute.backend.dto.DeliveryResponse::from)
-                    .toList();
+        List<DeliveryResponse> deliveries =
+                deliveryService.getAllDeliveries()
+                        .stream()
+                        .map(DeliveryResponse::from)
+                        .toList();
 
-    return ResponseEntity.ok(deliveries);
-}
+        return ResponseEntity.ok(deliveries);
+    }
+
+    // Retrieve real admin dashboard statistics
+    @GetMapping("/dashboard/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminDashboardResponse> getDashboardStats() {
+
+        AdminDashboardResponse dashboard =
+                adminDashboardService.getDashboard();
+
+        return ResponseEntity.ok(dashboard);
+    }
 }

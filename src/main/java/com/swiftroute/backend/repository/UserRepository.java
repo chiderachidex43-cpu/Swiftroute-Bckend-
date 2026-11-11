@@ -6,7 +6,7 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
+import com.swiftroute.backend.model.AccountStatus;
 import com.swiftroute.backend.model.User;
 import com.swiftroute.backend.model.Role;
 import jakarta.persistence.LockModeType;
@@ -39,4 +39,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
 @Query("SELECT u FROM User u WHERE LOWER(u.email) = LOWER(:email)")
 Optional<User> findByEmailForUpdate(@Param("email") String email);
+
+long countByRole(Role role);
+
+long countByRoleAndRiderApprovedTrue(Role role);
+
+long countByRoleAndAccountStatus(
+        Role role,
+        AccountStatus accountStatus
+);
+long countByRoleAndRiderApprovedTrueAndAccountStatus(
+        Role role,
+        AccountStatus accountStatus
+);
 }
